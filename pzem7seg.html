@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PZEM - 7-Segment Dashboard</title>
+  <!-- jQuery & jQuery UI (WAJIB) -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  <!-- sevenSeg.js -->
+  <script src="https://brandonlwhite.github.io/sevenSeg.js/sevenSeg.js"></script>
+  <!-- Paho MQTT -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+
+  <style>
+    body {
+      background: #000;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    .meter {
+      display: inline-block;
+      margin: 20px;
+      width: 320px;
+      background: #111;
+      border-radius: 8px;
+      padding: 15px;
+    }
+    .label {
+      margin-top: 8px;
+      font-size: 16px;
+      color: #ccc;
+    }
+    h2 {
+      margin-bottom: 30px;
+    }
+  </style>
+</head>
+<body>
+  <h2>🔌 PZEM Real-Time (7-Segment)</h2>
+
+  <div class="meter">
+    <div id="voltSeg"></div>
+    <div class="label">Tegangan (V)</div>
+  </div>
+
+  <div class="meter">
+    <div id="arusSeg"></div>
+    <div class="label">Arus (A)</div>
+  </div>
+
+  <div class="meter">
+    <div id="dayaSeg"></div>
+    <div class="label">Daya (W)</div>
+  </div>
+
+  <div class="meter">
+    <div id="kwhSeg"></div>
+    <div class="label">Energi (kWh)</div>
+  </div>
+
+  <div class="meter">
+    <div id="frekSeg"></div>
+    <div class="label">Frekuensi (Hz)</div>
+  </div>
+
+  <div class="meter">
+    <div id="pfSeg"></div>
+    <div class="label">Power Factor</div>
+  </div>
+
+  <script>
+    $(document).ready(function() {
+      // Inisialisasi semua 7-segment dengan warna berbeda
+      $("#voltSeg").sevenSeg({
+        digits: 6,
+        decimalPlaces: 2,
+        value: 0,
+        colorOn: "#FF5722",   // Orange
+        colorOff: "#333"
+      });
+
+      $("#arusSeg").sevenSeg({
+        digits: 6,
+        decimalPlaces: 3,
+        value: 0,
+        colorOn: "#2196F3",   // Blue
+        colorOff: "#333"
+      });
+
+      $("#dayaSeg").sevenSeg({
+        digits: 6,
+        decimalPlaces: 2,
+        value: 0,
+        colorOn: "#4CAF50",   // Green
+        colorOff: "#333"
+      });
+
+      $("#kwhSeg").sevenSeg({
+        digits: 6,
+        decimalPlaces: 2,
+        value: 0,
+        colorOn: "#FF9800",   // Amber
+        colorOff: "#333"
+      });
+
+      $("#frekSeg").sevenSeg({
+        digits: 5,
+        decimalPlaces: 1,
+        value: 50,
+        colorOn: "#9C27B0",   // Purple
+        colorOff: "#333"
+      });
+
+      $("#pfSeg").sevenSeg({
+        digits: 4,
+        decimalPlaces: 2,
+        value: 0,
+        colorOn: "#795548",   // Brown
+        colorOff: "#333"
+      });
+
+      // MQTT Client
+      const client = new Paho.MQTT.Client(
+        "test.mosquitto.org",
+        8081,
+        "/mqtt",
+        "pzem-7seg-" + Date.now()
+      );
+
+      client.onMessageArrived = (message) => {
+        try {
+          const data = JSON.parse(message.payloadString);
+          console.log("[JSON] Data valid:", data);
+          $("#voltSeg").sevenSeg("option", "value", data.volt || 0);
+          $("#arusSeg").sevenSeg("option", "value", data.arus || 0);
+          $("#dayaSeg").sevenSeg("option", "value", data.daya || 0);
+          $("#kwhSeg").sevenSeg("option", "value", data.kwh  || 0);
+          $("#frekSeg").sevenSeg("option", "value", data.frek || 50);
+          $("#pfSeg").sevenSeg("option", "value", data.pf   || 0);
+        } catch (e) {
+          console.warn("⚠️ Invalid JSON:", message.payloadString);
+        }
+      };
+
+      client.connect({
+        useSSL: true,
+        onSuccess: () => {
+          console.log("✅ Terhubung ke MQTT");
+          client.subscribe("/aisi555/pzem");
+        },
+        onFailure: (err) => {
+          console.error("❌ Gagal koneksi MQTT:", err);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

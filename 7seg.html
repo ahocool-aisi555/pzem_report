@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>4 Counter 7-Segment</title>
+  <style>
+    body {
+      background: #121212;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 30px;
+    }
+    .display {
+      margin: 25px auto;
+      width: fit-content;
+    }
+    .label {
+      margin-top: 8px;
+      font-size: 16px;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <h2>🔢 4 Counter 7-Segment (Tanpa MQTT)</h2>
+
+  <!-- Counter 1: Integer -->
+  <div class="display">
+    <canvas id="counter1" width="320" height="80"></canvas>
+    <div class="label">Counter Integer (0, 1, 2...)</div>
+  </div>
+
+  <!-- Counter 2: Desimal -->
+  <div class="display">
+    <canvas id="counter2" width="320" height="80"></canvas>
+    <div class="label">Desimal (12.34)</div>
+  </div>
+
+  <!-- Counter 3: Negatif -->
+  <div class="display">
+    <canvas id="counter3" width="320" height="80"></canvas>
+    <div class="label">Nilai Negatif (-45.6)</div>
+  </div>
+
+  <!-- Counter 4: Acak -->
+  <div class="display">
+    <canvas id="counter4" width="320" height="80"></canvas>
+    <div class="label">Acak (0–999)</div>
+  </div>
+
+  <!-- Load library via unpkg (CDN for npm) -->
+  <script type="module">
+    import SevenSegment from 'https://unpkg.com/seven-segment-display@1.0.3/dist/index.js';
+
+    // Buat 4 display
+    const seg1 = new SevenSegment(document.getElementById('counter1'), {
+      digits: 5,
+      decimalPlaces: 0,
+      colorOn: '#00ff00',
+      colorOff: '#333'
+    });
+
+    const seg2 = new SevenSegment(document.getElementById('counter2'), {
+      digits: 5,
+      decimalPlaces: 2,
+      colorOn: '#ffcc00',
+      colorOff: '#333'
+    });
+
+    const seg3 = new SevenSegment(document.getElementById('counter3'), {
+      digits: 5,
+      decimalPlaces: 1,
+      colorOn: '#ff5555',
+      colorOff: '#333'
+    });
+
+    const seg4 = new SevenSegment(document.getElementById('counter4'), {
+      digits: 4,
+      decimalPlaces: 0,
+      colorOn: '#55ffff',
+      colorOff: '#333'
+    });
+
+    // Nilai awal
+    let count1 = 0;
+    let count2 = 0;
+    let count3 = -10;
+
+    // Update tiap 500ms
+    setInterval(() => {
+      seg1.setValue(count1++);
+      seg2.setValue(count2 += 0.23);
+      seg3.setValue(count3 += 0.7);
+      seg4.setValue(Math.floor(Math.random() * 1000));
+    }, 500);
+  </script>
+</body>
+</html>

@@ -171,6 +171,7 @@
         client.onMessageArrived = (message) => {
           try {
             const data = JSON.parse(message.payloadString);
+            console.log("[JSON] Data valid:", data);
             // Update nilai gauge
             if (gaugeVolt) gaugeVolt.value = data.volt || 0;
             if (gaugeArus) gaugeArus.value = data.arus || 0;

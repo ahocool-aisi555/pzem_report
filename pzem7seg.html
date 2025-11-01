@@ -133,12 +133,12 @@
         try {
           const data = JSON.parse(message.payloadString);
           console.log("[JSON] Data valid:", data);
-          $("#voltSeg").sevenSeg("option", "value", data.volt || 0);
+          $("#voltSeg").sevenSeg("option", "value", String(data.volt) || 0);
           $("#arusSeg").sevenSeg("option", "value", String(data.arus) || 0);
-          $("#dayaSeg").sevenSeg("option", "value", data.daya || 0);
-          $("#kwhSeg").sevenSeg("option", "value", data.kwh  || 0);
-          $("#frekSeg").sevenSeg("option", "value", data.frek || 50);
-          $("#pfSeg").sevenSeg("option", "value", data.pf   || 0);
+          $("#dayaSeg").sevenSeg("option", "value", String(data.daya) || 0);
+          $("#kwhSeg").sevenSeg("option", "value", String(data.kwh)  || 0);
+          $("#frekSeg").sevenSeg("option", "value", String(data.frek) || 50);
+          $("#pfSeg").sevenSeg("option", "value", String(data.pf)   || 0);
         } catch (e) {
           console.warn("⚠️ Invalid JSON:", message.payloadString);
         }

@@ -162,7 +162,6 @@
 
             // === MQTT Setup ===
         const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "/mqtt", "elkadaya-" + Date.now());
-        client.connect({ useSSL: true, onSuccess: () => console.log("✅ MQTT connected") });
 
         client.onConnectionLost = (responseObject) => {
           console.log("Koneksi MQTT terputus:", responseObject.errorMessage);

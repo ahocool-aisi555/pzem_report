@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PZEM - Gauge Only</title>
+  <title>PZEM - Monitoring</title>
 
   <!-- Canvas Gauges (versi yang berfungsi) -->
   <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
@@ -40,7 +40,8 @@
 </head>
 <body>
 
-  <h2>PZEM Real-Time Monitoring (Gauge Only)</h2>
+  <h2>PZEM Real-Time Monitoring </h2>
+  <h2>Kelas Elektronika Daya - 2025 </h2>
 
   <div class="container">
     <!-- Volt -->
@@ -160,7 +161,7 @@
         const gaugeFrek = gauges[4];
         const gaugePf   = gauges[5];
 
-            // === MQTT Setup ===
+        // === MQTT Setup ===
         const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "/mqtt", "elkadaya-" + Date.now());
 
         client.onConnectionLost = (responseObject) => {
@@ -186,7 +187,7 @@
           useSSL: true, // <-- wajib true jika buka dari https:// atau localhost via Live Server
           onSuccess: () => {
             console.log("✅ Terhubung ke MQTT");
-            client.subscribe("/aisi555/pzem");
+            client.subscribe("/aisi555/pzem"); //subscribe ke TOPIK
           },
           onFailure: (err) => {
             console.error("❌ Gagal terhubung ke MQTT:", err);

@@ -94,231 +94,233 @@
 
   <!-- Paho MQTT -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-
-  <script>
-    // --- Inisialisasi 7-Segment ---
-    function createSevenSegment(id, digits = 6, decimals = 2) {
-      return new SevenSegment(document.getElementById(id), {
-        digits: digits,
-        decimalPlaces: decimals,
-        showColon: false,
-        colorOn: "#00ff00",
-        colorOff: "#333"
-      });
+<script>
+  // --- Definisi Kelas SevenSegment (harus di atas penggunaannya) ---
+  class SevenSegment {
+    constructor(canvas, options = {}) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.digits = options.digits || 6;
+      this.decimalPlaces = options.decimalPlaces || 0;
+      this.colorOn = options.colorOn || '#0f0';
+      this.colorOff = options.colorOff || '#333';
+      this.showColon = options.showColon || false;
+      this.value = 0;
+      this.resize();
+      window.addEventListener('resize', () => this.resize());
     }
 
-    const segArus = createSevenSegment('arusSeg', 6, 3);
-    const segDaya = createSevenSegment('dayaSeg', 6, 2);
-    const segKwh  = createSevenSegment('kwhSeg', 6, 2);
-    const segFrek = createSevenSegment('frekSeg', 5, 1);
-    const segPf   = createSevenSegment('pfSeg', 4, 2);
-
-    // --- Inisialisasi Grafik ---
-    const maxPoints = 50;
-    const labels = Array(maxPoints).fill('');
-
-    function createChart(canvasId, label, color) {
-      const ctx = document.getElementById(canvasId).getContext('2d');
-      return new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: label,
-            data: Array(maxPoints).fill(0),
-            borderColor: color,
-            backgroundColor: color + '40',
-            fill: false,
-            tension: 0.2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
-        }
-      });
+    resize() {
+      const size = Math.min(this.canvas.clientWidth, 150);
+      this.canvas.width = size * this.digits;
+      this.canvas.height = size;
+      this.segmentHeight = size * 0.15;
+      this.segmentWidth = size * 0.6;
+      this.padding = size * 0.05;
+      this.draw();
     }
 
-    const chartVolt = createChart('chartVolt', 'Volt', '#FF6384');
-    const chartArus = createChart('chartArus', 'Arus', '#36A2EB');
-    const chartDaya = createChart('chartDaya', 'Daya', '#FFCE56');
-    const chartKwh  = createChart('chartKwh', 'kWh', '#4BC0C0');
-    const chartFrek = createChart('chartFrek', 'Frek', '#9966FF');
-    const chartPf   = createChart('chartPf', 'PF', '#FF9F40');
-
-    // --- Update Grafik ---
-    function updateChart(chart, newValue) {
-      const data = chart.data.datasets[0].data;
-      data.push(newValue);
-      if (data.length > maxPoints) data.shift();
-      chart.update();
+    setValue(val) {
+      this.value = val;
+      this.draw();
     }
 
-    // --- MQTT Client ---
-    const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "pzem_web_client_" + Math.random().toString(16).substr(2, 8));
-
-    client.onConnectionLost = (responseObject) => {
-      console.log("Koneksi MQTT terputus:", responseObject.errorMessage);
-    };
-
-    client.onMessageArrived = (message) => {
-      try {
-        const payload = JSON.parse(message.payloadString);
-        const { volt, arus, daya, kwh, frek, pf } = payload;
-
-        // Update gauge
-        const gauge = document.gauges[0];
-        if (gauge) gauge.value = volt;
-
-        // Update 7-segment
-        segArus.setValue(arus);
-        segDaya.setValue(daya);
-        segKwh.setValue(kwh);
-        segFrek.setValue(frek);
-        segPf.setValue(pf);
-
-        // Update grafik
-        updateChart(chartVolt, volt);
-        updateChart(chartArus, arus);
-        updateChart(chartDaya, daya);
-        updateChart(chartKwh, kwh);
-        updateChart(chartFrek, frek);
-        updateChart(chartPf, pf);
-
-      } catch (e) {
-        console.error("Error parsing JSON:", e);
+    draw() {
+      const ctx = this.ctx;
+      ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      const str = this.value.toFixed(this.decimalPlaces).padStart(this.digits, ' ');
+      let x = 0;
+      for (let i = 0; i < str.length; i++) {
+        if (str[i] === '.') continue;
+        const char = str[i];
+        const isDecimal = i < str.length - 1 && str[i + 1] === '.';
+        this.drawDigit(ctx, char, x, 0, isDecimal);
+        x += this.segmentWidth + this.padding;
       }
-    };
+    }
 
-    client.connect({
-      onSuccess: () => {
-        console.log("Terhubung ke MQTT via WebSocket");
-        client.subscribe("/aisi555/pzem");
-      },
-      onFailure: (err) => {
-        console.error("Gagal terhubung ke MQTT:", err);
-      },
-      useSSL: false
-    });
+    drawDigit(ctx, char, x, y, hasDecimal) {
+      const h = this.segmentHeight;
+      const w = this.segmentWidth;
+      const on = this.colorOn;
+      const off = this.colorOff;
 
-    // --- Seven Segment Library (embedded) ---
-    class SevenSegment {
-      constructor(canvas, options = {}) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.digits = options.digits || 6;
-        this.decimalPlaces = options.decimalPlaces || 0;
-        this.colorOn = options.colorOn || '#0f0';
-        this.colorOff = options.colorOff || '#333';
-        this.showColon = options.showColon || false;
-        this.value = 0;
-        this.resize();
-        window.addEventListener('resize', () => this.resize());
-      }
+      const segMap = {
+        '0': [1,1,1,0,1,1,1],
+        '1': [0,0,1,0,0,1,0],
+        '2': [1,0,1,1,1,0,1],
+        '3': [1,0,1,1,0,1,1],
+        '4': [0,1,1,1,0,1,0],
+        '5': [1,1,0,1,0,1,1],
+        '6': [1,1,0,1,1,1,1],
+        '7': [1,0,1,0,0,1,0],
+        '8': [1,1,1,1,1,1,1],
+        '9': [1,1,1,1,0,1,1],
+        ' ': [0,0,0,0,0,0,0],
+        '-': [0,0,0,1,0,0,0]
+      };
+      const segments = segMap[char] || [0,0,0,0,0,0,0];
 
-      resize() {
-        const size = Math.min(this.canvas.clientWidth, 150);
-        this.canvas.width = size * this.digits;
-        this.canvas.height = size;
-        this.segmentHeight = size * 0.15;
-        this.segmentWidth = size * 0.6;
-        this.padding = size * 0.05;
-        this.draw();
-      }
+      // Posisi segmen (a, b, c, d, e, f, g)
+      const a = {x: x + h, y: y, w: w - 2*h, h: h};
+      const b = {x: x + w - h, y: y + h, w: h, h: w - 2*h};
+      const c = {x: x + w - h, y: y + w - h + h, w: h, h: w - 2*h};
+      const d = {x: x + h, y: y + w, w: w - 2*h, h: h};
+      const e = {x: x, y: y + w - h + h, w: h, h: w - 2*h};
+      const f = {x: x, y: y + h, w: h, h: w - 2*h};
+      const g = {x: x + h, y: y + w - h, w: w - 2*h, h: h};
 
-      setValue(val) {
-        this.value = val;
-        this.draw();
-      }
+      this.drawRoundedRect(ctx, a.x, a.y, a.w, a.h, h, segments[0] ? on : off); // a
+      this.drawRoundedRect(ctx, b.x, b.y, b.w, b.h, h, segments[2] ? on : off); // b
+      this.drawRoundedRect(ctx, c.x, c.y, c.w, c.h, h, segments[5] ? on : off); // c
+      this.drawRoundedRect(ctx, d.x, d.y, d.w, d.h, h, segments[6] ? on : off); // d
+      this.drawRoundedRect(ctx, e.x, e.y, e.w, e.h, h, segments[4] ? on : off); // e
+      this.drawRoundedRect(ctx, f.x, f.y, f.w, f.h, h, segments[1] ? on : off); // f
+      this.drawRoundedRect(ctx, g.x, g.y, g.w, g.h, h, segments[3] ? on : off); // g
 
-      draw() {
-        const ctx = this.ctx;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        const str = this.value.toFixed(this.decimalPlaces).padStart(this.digits, ' ');
-        let x = 0;
-        for (let i = 0; i < str.length; i++) {
-          if (str[i] === '.') continue;
-          const char = str[i];
-          const isDecimal = i < str.length - 1 && str[i + 1] === '.';
-          this.drawDigit(ctx, char, x, 0, isDecimal);
-          x += this.segmentWidth + this.padding;
-        }
-      }
-
-      drawDigit(ctx, char, x, y, hasDecimal) {
-        const h = this.segmentHeight;
-        const w = this.segmentWidth;
-        const on = this.colorOn;
-        const off = this.colorOff;
-
-        const segments = {
-          '0': [1,1,1,0,1,1,1],
-          '1': [0,0,1,0,0,1,0],
-          '2': [1,0,1,1,1,0,1],
-          '3': [1,0,1,1,0,1,1],
-          '4': [0,1,1,1,0,1,0],
-          '5': [1,1,0,1,0,1,1],
-          '6': [1,1,0,1,1,1,1],
-          '7': [1,0,1,0,0,1,0],
-          '8': [1,1,1,1,1,1,1],
-          '9': [1,1,1,1,0,1,1],
-          ' ': [0,0,0,0,0,0,0],
-          '-': [0,0,0,1,0,0,0]
-        }[char] || [0,0,0,0,0,0,0];
-
-        const segs = [
-          {x: x + h, y: y, w: w - 2*h, h: h, r: h}, // a
-          {x: x, y: y + h, w: h, h: w - 2*h, r: h}, // f
-          {x: x + w - h, y: y + h, w: h, h: w - 2*h, r: h}, // b
-          {x: x + h, y: y + w - h, w: w - 2*h, h: h, r: h}, // g
-          {x: x, y: y + w - h + h, w: h, h: w - 2*h, r: h}, // e
-          {x: x + w - h, y: y + w - h + h, w: h, h: w - 2*h, r: h}, // c
-          {x: x + h, y: y + w, w: w - 2*h, h: h, r: h} // d (not used here)
-        ];
-
-        // Horizontal segments: a, g, d
-        // Vertical: f, b, e, c
-
-        // a
-        this.drawRoundedRect(ctx, segs[0].x, segs[0].y, segs[0].w, segs[0].h, segs[0].r, segments[0] ? on : off);
-        // f
-        this.drawRoundedRect(ctx, segs[1].x, segs[1].y, segs[1].w, segs[1].h, segs[1].r, segments[1] ? on : off);
-        // b
-        this.drawRoundedRect(ctx, segs[2].x, segs[2].y, segs[2].w, segs[2].h, segs[2].r, segments[2] ? on : off);
-        // g
-        this.drawRoundedRect(ctx, segs[3].x, segs[3].y, segs[3].w, segs[3].h, segs[3].r, segments[3] ? on : off);
-        // e
-        this.drawRoundedRect(ctx, segs[4].x, segs[4].y, segs[4].w, segs[4].h, segs[4].r, segments[4] ? on : off);
-        // c
-        this.drawRoundedRect(ctx, segs[5].x, segs[5].y, segs[5].w, segs[5].h, segs[5].r, segments[5] ? on : off);
-
-        if (hasDecimal) {
-          ctx.fillStyle = on;
-          ctx.beginPath();
-          ctx.arc(x + w + this.padding - 5, y + w - 5, 3, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      drawRoundedRect(ctx, x, y, width, height, radius, color) {
-        ctx.fillStyle = color;
+      if (hasDecimal) {
+        ctx.fillStyle = on;
         ctx.beginPath();
-        ctx.moveTo(x + radius, y);
-        ctx.lineTo(x + width - radius, y);
-        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-        ctx.lineTo(x + width, y + height - radius);
-        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-        ctx.lineTo(x + radius, y + height);
-        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-        ctx.lineTo(x, y + radius);
-        ctx.quadraticCurveTo(x, y, x + radius, y);
-        ctx.closePath();
+        ctx.arc(x + w + this.padding - 5, y + w - 5, 3, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-  </script>
+    drawRoundedRect(ctx, x, y, width, height, radius, color) {
+      if (width <= 0 || height <= 0) return;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // --- Fungsi Bantuan ---
+  function createSevenSegment(id, digits = 6, decimals = 2) {
+    return new SevenSegment(document.getElementById(id), {
+      digits: digits,
+      decimalPlaces: decimals,
+      colorOn: "#00ff00",
+      colorOff: "#333"
+    });
+  }
+
+  // --- Inisialisasi Setelah DOM Siap ---
+  document.addEventListener('DOMContentLoaded', () => {
+    // Tunggu sedikit agar canvas-gauges selesai inisialisasi
+    setTimeout(() => {
+      // === 7-Segment ===
+      const segArus = createSevenSegment('arusSeg', 6, 3);
+      const segDaya = createSevenSegment('dayaSeg', 6, 2);
+      const segKwh  = createSevenSegment('kwhSeg', 6, 2);
+      const segFrek = createSevenSegment('frekSeg', 5, 1);
+      const segPf   = createSevenSegment('pfSeg', 4, 2);
+
+      // === Grafik ===
+      const maxPoints = 50;
+      function createChart(canvasId, label, color) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        return new Chart(ctx, {
+          type: 'line',
+           {
+            labels: Array(maxPoints).fill(''),
+            datasets: [{
+              label: label,
+               Array(maxPoints).fill(0),
+              borderColor: color,
+              backgroundColor: color + '40',
+              fill: false,
+              tension: 0.2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } },
+            plugins: { legend: { display: false } }
+          }
+        });
+      }
+
+      const chartVolt = createChart('chartVolt', 'Volt', '#FF6384');
+      const chartArus = createChart('chartArus', 'Arus', '#36A2EB');
+      const chartDaya = createChart('chartDaya', 'Daya', '#FFCE56');
+      const chartKwh  = createChart('chartKwh', 'kWh', '#4BC0C0');
+      const chartFrek = createChart('chartFrek', 'Frek', '#9966FF');
+      const chartPf   = createChart('chartPf', 'PF', '#FF9F40');
+
+      function updateChart(chart, newValue) {
+        const data = chart.data.datasets[0].data;
+        data.push(newValue);
+        if (data.length > maxPoints) data.shift();
+        chart.update();
+      }
+
+      // === MQTT ===
+      const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "pzem_web_client_" + Math.random().toString(16).substr(2, 8));
+
+      client.onConnectionLost = (responseObject) => {
+        console.log("Koneksi MQTT terputus:", responseObject.errorMessage);
+      };
+
+      client.onMessageArrived = (message) => {
+        try {
+          const payload = JSON.parse(message.payloadString);
+          const { volt, arus, daya, kwh, frek, pf } = payload;
+
+          // Update gauge (pastikan gauge sudah ada)
+          if (window.gauges && window.gauges.length > 0) {
+            window.gauges[0].value = volt;
+          }
+
+          // Update 7-segment
+          segArus.setValue(arus);
+          segDaya.setValue(daya);
+          segKwh.setValue(kwh);
+          segFrek.setValue(frek);
+          segPf.setValue(pf);
+
+          // Update grafik
+          updateChart(chartVolt, volt);
+          updateChart(chartArus, arus);
+          updateChart(chartDaya, daya);
+          updateChart(chartKwh, kwh);
+          updateChart(chartFrek, frek);
+          updateChart(chartPf, pf);
+
+        } catch (e) {
+          console.error("Error parsing JSON:", e);
+        }
+      };
+
+      client.connect({
+        onSuccess: () => {
+          console.log("Terhubung ke MQTT via WebSocket");
+          client.subscribe("/aisi555/pzem");
+        },
+        onFailure: (err) => {
+          console.error("Gagal terhubung ke MQTT:", err);
+        },
+        useSSL: false
+      });
+
+      // Simpan referensi global untuk akses gauge
+      window.segArus = segArus;
+      window.segDaya = segDaya;
+      // ... dll jika perlu debug
+
+    }, 500); // Tunda sebentar agar canvas-gauges siap
+  });
+</script>
+
 </body>
 </html>

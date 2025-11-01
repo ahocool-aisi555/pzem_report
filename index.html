@@ -183,6 +183,7 @@
         };
 
         client.connect({
+          useSSL: true, // <-- wajib true jika buka dari https:// atau localhost via Live Server
           onSuccess: () => {
             console.log("✅ Terhubung ke MQTT");
             client.subscribe("/aisi555/pzem");

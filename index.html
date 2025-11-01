@@ -3,324 +3,197 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PZEM MQTT Dashboard</title>
+  <title>PZEM - Gauge Only</title>
 
-  <!-- Canvas Gauges (untuk gauge volt) -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
-
-  <!-- Chart.js (untuk grafik) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Seven Segment Display -->
-  <style>
-    .segment-container {
-      display: inline-block;
-      margin: 10px;
-      text-align: center;
-      font-family: Arial, sans-serif;
-    }
-    .segment-label {
-      font-size: 14px;
-      margin-top: 5px;
-      color: #333;
-    }
-    canvas.sevenseg {
-      width: 120px !important;
-      height: auto !important;
-    }
-  </style>
-</head>
-<body style="padding: 20px; background: #f5f5f5; font-family: Arial">
-
-  <h2 style="text-align: center;">PZEM Real-Time Monitoring</h2>
-
-  <!-- Gauge Tegangan -->
-  <div style="text-align: center; margin-bottom: 30px;">
-    <canvas id="voltGauge" data-type="radial-gauge"
-      data-width="300"
-      data-height="300"
-      data-min-value="0"
-      data-max-value="300"
-      data-major-ticks="0,50,100,150,200,250,300"
-      data-minor-ticks="5"
-      data-units="V"
-      data-title="Tegangan"
-      data-value="0"
-      data-glow="true"
-      data-color-value="#0080FF"
-      data-color-plate="#fff"
-      data-needle-type="arrow"
-      data-needle-width="2"
-      data-border-shadow-width="1"
-      data-borders="true"
-      data-border-inner-width="2"
-      data-border-outer-width="2">
-    </canvas>
-  </div>
-
-  <!-- 7-Segment Displays -->
-  <div style="text-align: center; margin: 20px 0;">
-    <div class="segment-container">
-      <canvas id="arusSeg" class="sevenseg"></canvas>
-      <div class="segment-label">Arus (A)</div>
-    </div>
-    <div class="segment-container">
-      <canvas id="dayaSeg" class="sevenseg"></canvas>
-      <div class="segment-label">Daya (W)</div>
-    </div>
-    <div class="segment-container">
-      <canvas id="kwhSeg" class="sevenseg"></canvas>
-      <div class="segment-label">Energi (kWh)</div>
-    </div>
-    <div class="segment-container">
-      <canvas id="frekSeg" class="sevenseg"></canvas>
-      <div class="segment-label">Frekuensi (Hz)</div>
-    </div>
-    <div class="segment-container">
-      <canvas id="pfSeg" class="sevenseg"></canvas>
-      <div class="segment-label">PF</div>
-    </div>
-  </div>
-
-  <!-- Grafik Garis -->
-  <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; margin-top: 30px;">
-    <div><canvas id="chartVolt" width="300" height="200"></canvas></div>
-    <div><canvas id="chartArus" width="300" height="200"></canvas></div>
-    <div><canvas id="chartDaya" width="300" height="200"></canvas></div>
-    <div><canvas id="chartKwh" width="300" height="200"></canvas></div>
-    <div><canvas id="chartFrek" width="300" height="200"></canvas></div>
-    <div><canvas id="chartPf" width="300" height="200"></canvas></div>
-  </div>
+  <!-- Canvas Gauges (versi yang berfungsi) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauges.min.js"></script>
 
   <!-- Paho MQTT -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-<script>
-  // --- Definisi Kelas SevenSegment (harus di atas penggunaannya) ---
-  class SevenSegment {
-    constructor(canvas, options = {}) {
-      this.canvas = canvas;
-      this.ctx = canvas.getContext('2d');
-      this.digits = options.digits || 6;
-      this.decimalPlaces = options.decimalPlaces || 0;
-      this.colorOn = options.colorOn || '#0f0';
-      this.colorOff = options.colorOff || '#333';
-      this.showColon = options.showColon || false;
-      this.value = 0;
-      this.resize();
-      window.addEventListener('resize', () => this.resize());
+
+  <style>
+    body {
+      background: #f0f0f0;
+      font-family: Arial, sans-serif;
+      padding: 20px;
     }
-
-    resize() {
-      const size = Math.min(this.canvas.clientWidth, 150);
-      this.canvas.width = size * this.digits;
-      this.canvas.height = size;
-      this.segmentHeight = size * 0.15;
-      this.segmentWidth = size * 0.6;
-      this.padding = size * 0.05;
-      this.draw();
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 30px;
+      max-width: 1200px;
+      margin: 0 auto;
     }
-
-    setValue(val) {
-      this.value = val;
-      this.draw();
+    .gauge-box {
+      text-align: center;
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
-
-    draw() {
-      const ctx = this.ctx;
-      ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      const str = this.value.toFixed(this.decimalPlaces).padStart(this.digits, ' ');
-      let x = 0;
-      for (let i = 0; i < str.length; i++) {
-        if (str[i] === '.') continue;
-        const char = str[i];
-        const isDecimal = i < str.length - 1 && str[i + 1] === '.';
-        this.drawDigit(ctx, char, x, 0, isDecimal);
-        x += this.segmentWidth + this.padding;
-      }
+    h2 {
+      text-align: center;
+      color: #333;
     }
+  </style>
+</head>
+<body>
 
-    drawDigit(ctx, char, x, y, hasDecimal) {
-      const h = this.segmentHeight;
-      const w = this.segmentWidth;
-      const on = this.colorOn;
-      const off = this.colorOff;
+  <h2>PZEM Real-Time Monitoring (Gauge Only)</h2>
 
-      const segMap = {
-        '0': [1,1,1,0,1,1,1],
-        '1': [0,0,1,0,0,1,0],
-        '2': [1,0,1,1,1,0,1],
-        '3': [1,0,1,1,0,1,1],
-        '4': [0,1,1,1,0,1,0],
-        '5': [1,1,0,1,0,1,1],
-        '6': [1,1,0,1,1,1,1],
-        '7': [1,0,1,0,0,1,0],
-        '8': [1,1,1,1,1,1,1],
-        '9': [1,1,1,1,0,1,1],
-        ' ': [0,0,0,0,0,0,0],
-        '-': [0,0,0,1,0,0,0]
-      };
-      const segments = segMap[char] || [0,0,0,0,0,0,0];
+  <div class="container">
+    <!-- Volt -->
+    <div class="gauge-box">
+      <canvas id="gaugeVolt" data-type="radial-gauge"
+        data-width="220"
+        data-height="220"
+        data-min-value="0"
+        data-max-value="300"
+        data-major-ticks="0,50,100,150,200,250,300"
+        data-units="V"
+        data-title="Tegangan"
+        data-value="0"
+        data-color-value="#FF5722"
+        data-glow="true">
+      </canvas>
+    </div>
 
-      // Posisi segmen (a, b, c, d, e, f, g)
-      const a = {x: x + h, y: y, w: w - 2*h, h: h};
-      const b = {x: x + w - h, y: y + h, w: h, h: w - 2*h};
-      const c = {x: x + w - h, y: y + w - h + h, w: h, h: w - 2*h};
-      const d = {x: x + h, y: y + w, w: w - 2*h, h: h};
-      const e = {x: x, y: y + w - h + h, w: h, h: w - 2*h};
-      const f = {x: x, y: y + h, w: h, h: w - 2*h};
-      const g = {x: x + h, y: y + w - h, w: w - 2*h, h: h};
+    <!-- Arus -->
+    <div class="gauge-box">
+      <canvas id="gaugeArus" data-type="radial-gauge"
+        data-width="220"
+        data-height="220"
+        data-min-value="0"
+        data-max-value="100"
+        data-major-ticks="0,10,20,30,40,50,60,70,80,90,100"
+        data-units="A"
+        data-title="Arus"
+        data-value="0"
+        data-color-value="#2196F3"
+        data-glow="true">
+      </canvas>
+    </div>
 
-      this.drawRoundedRect(ctx, a.x, a.y, a.w, a.h, h, segments[0] ? on : off); // a
-      this.drawRoundedRect(ctx, b.x, b.y, b.w, b.h, h, segments[2] ? on : off); // b
-      this.drawRoundedRect(ctx, c.x, c.y, c.w, c.h, h, segments[5] ? on : off); // c
-      this.drawRoundedRect(ctx, d.x, d.y, d.w, d.h, h, segments[6] ? on : off); // d
-      this.drawRoundedRect(ctx, e.x, e.y, e.w, e.h, h, segments[4] ? on : off); // e
-      this.drawRoundedRect(ctx, f.x, f.y, f.w, f.h, h, segments[1] ? on : off); // f
-      this.drawRoundedRect(ctx, g.x, g.y, g.w, g.h, h, segments[3] ? on : off); // g
+    <!-- Daya -->
+    <div class="gauge-box">
+      <canvas id="gaugeDaya" data-type="radial-gauge"
+        data-width="220"
+        data-height="220"
+        data-min-value="0"
+        data-max-value="10000"
+        data-major-ticks="0,2000,4000,6000,8000,10000"
+        data-units="W"
+        data-title="Daya"
+        data-value="0"
+        data-color-value="#4CAF50"
+        data-glow="true">
+      </canvas>
+    </div>
 
-      if (hasDecimal) {
-        ctx.fillStyle = on;
-        ctx.beginPath();
-        ctx.arc(x + w + this.padding - 5, y + w - 5, 3, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
+    <!-- kWh -->
+    <div class="gauge-box">
+      <canvas id="gaugeKwh" data-type="radial-gauge"
+        data-width="220"
+        data-height="220"
+        data-min-value="0"
+        data-max-value="100"
+        data-major-ticks="0,10,20,30,40,50,60,70,80,90,100"
+        data-units="kWh"
+        data-title="Energi"
+        data-value="0"
+        data-color-value="#FF9800"
+        data-glow="true">
+      </canvas>
+    </div>
 
-    drawRoundedRect(ctx, x, y, width, height, radius, color) {
-      if (width <= 0 || height <= 0) return;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + width - radius, y);
-      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-      ctx.lineTo(x + width, y + height - radius);
-      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-      ctx.lineTo(x + radius, y + height);
-      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-      ctx.lineTo(x, y + radius);
-      ctx.quadraticCurveTo(x, y, x + radius, y);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
+    <!-- Frekuensi -->
+    <div class="gauge-box">
+      <canvas id="gaugeFrek" data-type="radial-gauge"
+        data-width="220"
+        data-height="220"
+        data-min-value="40"
+        data-max-value="60"
+        data-major-ticks="40,45,50,55,60"
+        data-units="Hz"
+        data-title="Frekuensi"
+        data-value="50"
+        data-color-value="#9C27B0"
+        data-glow="true">
+      </canvas>
+    </div>
 
-  // --- Fungsi Bantuan ---
-  function createSevenSegment(id, digits = 6, decimals = 2) {
-    return new SevenSegment(document.getElementById(id), {
-      digits: digits,
-      decimalPlaces: decimals,
-      colorOn: "#00ff00",
-      colorOff: "#333"
-    });
-  }
+    <!-- PF -->
+    <div class="gauge-box">
+      <canvas id="gaugePf" data-type="radial-gauge"
+        data-width="220"
+        data-height="220"
+        data-min-value="0"
+        data-max-value="1"
+        data-major-ticks="0,0.2,0.4,0.6,0.8,1.0"
+        data-units=""
+        data-title="Power Factor"
+        data-value="0"
+        data-color-value="#795548"
+        data-glow="true">
+      </canvas>
+    </div>
+  </div>
 
-  // --- Inisialisasi Setelah DOM Siap ---
-  document.addEventListener('DOMContentLoaded', () => {
-    // Tunggu sedikit agar canvas-gauges selesai inisialisasi
-    setTimeout(() => {
-      // === 7-Segment ===
-      const segArus = createSevenSegment('arusSeg', 6, 3);
-      const segDaya = createSevenSegment('dayaSeg', 6, 2);
-      const segKwh  = createSevenSegment('kwhSeg', 6, 2);
-      const segFrek = createSevenSegment('frekSeg', 5, 1);
-      const segPf   = createSevenSegment('pfSeg', 4, 2);
+  <script>
+    // Tunggu DOM dan gauge siap
+    window.addEventListener('load', () => {
+      // Tunda sebentar agar canvas-gauges selesai inisialisasi
+      setTimeout(() => {
+        // Ambil semua gauge instance (canvas-gauges menyimpan di window.gauges)
+        const gauges = window.gauges || [];
+        if (gauges.length < 6) {
+          console.error("Gauge tidak terinisialisasi dengan benar");
+          return;
+        }
 
-      // === Grafik ===
-      const maxPoints = 50;
-      function createChart(canvasId, label, color) {
-        const ctx = document.getElementById(canvasId).getContext('2d');
-        return new Chart(ctx, {
-          type: 'line',
-           {
-            labels: Array(maxPoints).fill(''),
-            datasets: [{
-              label: label,
-               Array(maxPoints).fill(0),
-              borderColor: color,
-              backgroundColor: color + '40',
-              fill: false,
-              tension: 0.2
-            }]
+        // Urutan sesuai urutan <canvas> di HTML
+        const gaugeVolt = gauges[0];
+        const gaugeArus = gauges[1];
+        const gaugeDaya = gauges[2];
+        const gaugeKwh  = gauges[3];
+        const gaugeFrek = gauges[4];
+        const gaugePf   = gauges[5];
+
+        // MQTT Client
+        const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "pzem_gauge_" + Math.random().toString(16).substr(2, 8));
+
+        client.onConnectionLost = (responseObject) => {
+          console.log("Koneksi MQTT terputus:", responseObject.errorMessage);
+        };
+
+        client.onMessageArrived = (message) => {
+          try {
+            const data = JSON.parse(message.payloadString);
+            // Update nilai gauge
+            if (gaugeVolt) gaugeVolt.value = data.volt || 0;
+            if (gaugeArus) gaugeArus.value = data.arus || 0;
+            if (gaugeDaya) gaugeDaya.value = data.daya || 0;
+            if (gaugeKwh)  gaugeKwh.value  = data.kwh  || 0;
+            if (gaugeFrek) gaugeFrek.value = data.frek || 50;
+            if (gaugePf)   gaugePf.value   = data.pf   || 0;
+          } catch (e) {
+            console.error("Error parsing MQTT message:", e);
+          }
+        };
+
+        client.connect({
+          onSuccess: () => {
+            console.log("✅ Terhubung ke MQTT");
+            client.subscribe("/aisi555/pzem");
           },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: { y: { beginAtZero: true } },
-            plugins: { legend: { display: false } }
+          onFailure: (err) => {
+            console.error("❌ Gagal terhubung ke MQTT:", err);
           }
         });
-      }
 
-      const chartVolt = createChart('chartVolt', 'Volt', '#FF6384');
-      const chartArus = createChart('chartArus', 'Arus', '#36A2EB');
-      const chartDaya = createChart('chartDaya', 'Daya', '#FFCE56');
-      const chartKwh  = createChart('chartKwh', 'kWh', '#4BC0C0');
-      const chartFrek = createChart('chartFrek', 'Frek', '#9966FF');
-      const chartPf   = createChart('chartPf', 'PF', '#FF9F40');
-
-      function updateChart(chart, newValue) {
-        const data = chart.data.datasets[0].data;
-        data.push(newValue);
-        if (data.length > maxPoints) data.shift();
-        chart.update();
-      }
-
-      // === MQTT ===
-      const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "pzem_web_client_" + Math.random().toString(16).substr(2, 8));
-
-      client.onConnectionLost = (responseObject) => {
-        console.log("Koneksi MQTT terputus:", responseObject.errorMessage);
-      };
-
-      client.onMessageArrived = (message) => {
-        try {
-          const payload = JSON.parse(message.payloadString);
-          const { volt, arus, daya, kwh, frek, pf } = payload;
-
-          // Update gauge (pastikan gauge sudah ada)
-          if (window.gauges && window.gauges.length > 0) {
-            window.gauges[0].value = volt;
-          }
-
-          // Update 7-segment
-          segArus.setValue(arus);
-          segDaya.setValue(daya);
-          segKwh.setValue(kwh);
-          segFrek.setValue(frek);
-          segPf.setValue(pf);
-
-          // Update grafik
-          updateChart(chartVolt, volt);
-          updateChart(chartArus, arus);
-          updateChart(chartDaya, daya);
-          updateChart(chartKwh, kwh);
-          updateChart(chartFrek, frek);
-          updateChart(chartPf, pf);
-
-        } catch (e) {
-          console.error("Error parsing JSON:", e);
-        }
-      };
-
-      client.connect({
-        onSuccess: () => {
-          console.log("Terhubung ke MQTT via WebSocket");
-          client.subscribe("/aisi555/pzem");
-        },
-        onFailure: (err) => {
-          console.error("Gagal terhubung ke MQTT:", err);
-        },
-        useSSL: false
-      });
-
-      // Simpan referensi global untuk akses gauge
-      window.segArus = segArus;
-      window.segDaya = segDaya;
-      // ... dll jika perlu debug
-
-    }, 500); // Tunda sebentar agar canvas-gauges siap
-  });
-</script>
-
+      }, 800); // Tunggu 800ms agar gauge siap
+    });
+  </script>
 </body>
 </html>

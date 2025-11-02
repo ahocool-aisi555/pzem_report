@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PZEM - Text Only</title>
+  <style>
+    body {
+      background: #f0f0f0;
+      font-family: monospace;
+      padding: 30px;
+      line-height: 1.6;
+    }
+    .data {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .label {
+      font-weight: bold;
+      color: #333;
+    }
+    .value {
+      color: #d32f2f;
+    }
+  </style>
+  <!-- Paho MQTT -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+</head>
+<body>
+  <h2 style="text-align: center;">🔌 PZEM - Text Display</h2>
+  
+  <div class="data">
+    <div><span class="label">Tegangan:</span> <span id="volt" class="value">--</span> V</div>
+    <div><span class="label">Arus:</span> <span id="arus" class="value">--</span> A</div>
+    <div><span class="label">Daya:</span> <span id="daya" class="value">--</span> W</div>
+    <div><span class="label">Energi:</span> <span id="kwh" class="value">--</span> kWh</div>
+    <div><span class="label">Frekuensi:</span> <span id="frek" class="value">--</span> Hz</div>
+    <div><span class="label">PF:</span> <span id="pf" class="value">--</span></div>
+  </div>
+
+  <script>
+    // Buat client MQTT
+    const client = new Paho.MQTT.Client(
+      "test.mosquitto.org",
+      8081,
+      "/mqtt",
+      "pzem-text-" + Date.now()
+    );
+
+    client.onMessageArrived = (message) => {
+      try {
+        const data = JSON.parse(message.payloadString);
+        document.getElementById("volt").textContent = (data.volt || 0).toFixed(2);
+        document.getElementById("arus").textContent = (data.arus || 0).toFixed(3);
+        document.getElementById("daya").textContent = (data.daya || 0).toFixed(2);
+        document.getElementById("kwh").textContent  = (data.kwh  || 0).toFixed(2);
+        document.getElementById("frek").textContent = (data.frek || 0).toFixed(1);
+        document.getElementById("pf").textContent   = (data.pf   || 0).toFixed(2);
+      } catch (e) {
+        console.error("❌ Invalid JSON:", message.payloadString);
+      }
+    };
+
+    client.connect({
+      useSSL: true,
+      onSuccess: () => {
+        console.log("✅ Connected to MQTT");
+        client.subscribe("/aisi555/pzem");
+      },
+      onFailure: (err) => {
+        console.error("💥 MQTT connection failed:", err);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -53,12 +53,12 @@
     client.onMessageArrived = (message) => {
       try {
         const data = JSON.parse(message.payloadString);
-        document.getElementById("volt").textContent = (data.volt || 0).toFixed(2);
-        document.getElementById("arus").textContent = (data.arus || 0).toFixed(3);
-        document.getElementById("daya").textContent = (data.daya || 0).toFixed(2);
-        document.getElementById("kwh").textContent  = (data.kwh  || 0).toFixed(2);
-        document.getElementById("frek").textContent = (data.frek || 0).toFixed(1);
-        document.getElementById("pf").textContent   = (data.pf   || 0).toFixed(2);
+        document.getElementById("volt").textContent = (data.volt || 0);
+        document.getElementById("arus").textContent = (data.arus || 0);
+        document.getElementById("daya").textContent = (data.daya || 0);
+        document.getElementById("kwh").textContent  = (data.kwh  || 0);
+        document.getElementById("frek").textContent = (data.frek || 0);
+        document.getElementById("pf").textContent   = (data.pf   || 0);
       } catch (e) {
         console.error("❌ Invalid JSON:", message.payloadString);
       }

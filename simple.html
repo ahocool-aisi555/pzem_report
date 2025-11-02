@@ -53,6 +53,7 @@
     client.onMessageArrived = (message) => {
       try {
         const data = JSON.parse(message.payloadString);
+        console.log(data);
         document.getElementById("volt").textContent = (data.volt || 0);
         document.getElementById("arus").textContent = (data.arus || 0);
         document.getElementById("daya").textContent = (data.daya || 0);

@@ -22,3 +22,5 @@ by nyoman yudi kurniawan
 
 
 Alat ini berbasis ESP8266 dan MQTT sebagai protokol IOT
+
+format json : {"volt":229.10,"arus":0.037,"daya":5.20,"kwh":0.03,"frek":50.0,"pf":0.61}

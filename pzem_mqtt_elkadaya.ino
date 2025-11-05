@@ -1,6 +1,12 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <PZEM004Tv30.h>
 
+// Gunakan Serial2 (software serial) karena Serial0 digunakan untuk debug
+#include <SoftwareSerial.h>
+SoftwareSerial pzemSerial(D6, D7); // RX, TX → sesuaikan pin!
+
+PZEM004Tv30 pzem(pzemSerial);
 
 
 const char *ssid =  "WesGakUsah";   // cannot be longer than 32 characters!
@@ -14,26 +20,26 @@ const char *mqtt_user = "";
 const char *mqtt_pass = "";
 const char *mqtt_client_name = "ahocool123"; // Client connections cant have the same connection name
 
-
-#define TOPIC "/aisi555/dimmer"
-
-
-#define LED 5
-
-
-
+// timer mqtt
+unsigned long lastMsg = 0;
+#define MSG_DELAY 10000
+#define TOPIK "/aisi555/pzem"
 
 WiFiClient wclient;
 PubSubClient client(wclient);
 
 void setup() {
-  pinMode(LED, OUTPUT);
+
   
-  
+  pzemSerial.begin(9600);
+  // atur alamat Modbus pzem
+  pzem.setAddress(0x01);
+  // parameter MQTT
   client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(mqtt_callback);
+  //serial debug
   Serial.begin(9600);
   delay(10);
+  
   Serial.println();
   Serial.println();
   setupwifi();
@@ -68,12 +74,6 @@ void reconnectmqtt()
       }
    
 
-    if (client.connected()){
-      Serial.println("subscribe to topic: ");
-      Serial.println(TOPIC);
-      client.subscribe(TOPIC); //subscribe ke topic dimmer
-    }
-  
 
 }
 
@@ -83,33 +83,56 @@ void loop() {
    {
     reconnectmqtt();
    }
-   else client.loop(); //cek terus kalau ada data masuk
+   else client.loop(); 
   
   
-  
+  // Kirim pzem tiap 10 detik
+  unsigned long now = millis();
+  if (now - lastMsg > MSG_DELAY) {
+    lastMsg = now;
+    kirim_pzem();
+  }
 }
 
 
-void mqtt_callback(char* topic, byte* payload, unsigned int length) {
- 
-  Serial.print("Message arrived in topic: ");
-  Serial.println(topic);
- 
- 
-  String message;
-  for (int i = 0; i < length; i++) {
-    message = message + (char)payload[i];  //Conver *byte to String
-   }
-     
-  
-  int pwm = message.toInt();
+void kirim_pzem()
+{
 
-  analogWrite(LED, pwm);
-    
-  Serial.println("---atur nyala lampu----");
-  Serial.print(" Level : ");
-  Serial.println(pwm);
-  Serial.println("-----------------------");  
+  float voltage = pzem.voltage();
+  float current = pzem.current();
+  float power = pzem.power();
+  float energy = pzem.energy();
+  float frequency = pzem.frequency();
+  float pf = pzem.pf();
 
+  if(isnan(voltage)){
+    Serial.println("Error membaca PZEM!");
+  } else {
+    Serial.print("Tegangan: "); Serial.print(voltage); Serial.println(" V");
+    Serial.print("Arus: "); Serial.print(current); Serial.println(" A");
+    Serial.print("Daya: "); Serial.print(power); Serial.println(" W");
+    Serial.print("Energi: "); Serial.print(energy); Serial.println(" kWh");
+    Serial.print("Frekuensi: "); Serial.print(frequency); Serial.println(" Hz");
+    Serial.print("PF: "); Serial.println(pf);
+
+    String json = "{\"volt\":";
+    json += String(voltage, 2);  // 2 angka di belakang koma
+    json += ",\"arus\":";
+    json += String(current, 3);
+    json += ",\"daya\":";
+    json += String(power, 2);
+    json += ",\"kwh\":";
+    json += String(energy, 2);
+    json += ",\"frek\":";
+    json += String(frequency, 1);
+    json += ",\"pf\":";
+    json += String(pf, 2);
+    json += "}";
+
+    // Kirim via MQTT
+    client.publish(TOPIK, json.c_str());
+
+    Serial.println(json); //  lihat di Serial Monitor
+  }
 
 }

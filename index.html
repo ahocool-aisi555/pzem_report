@@ -1,202 +1,215 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PZEM - Monitoring</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PZEM-016 Monitor - GitHub Pages</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
 
-  <!-- Canvas Gauges (versi yang berfungsi) -->
-  <script src="https://cdn.jsdelivr.net/npm/canvas-gauges@2.1.7/gauge.min.js"></script>
-
-  <!-- Paho MQTT -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
-
-  <style>
-    body {
-      background: #f0f0f0;
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    .container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 30px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-    .gauge-box {
-      text-align: center;
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    h2 {
-      text-align: center;
-      color: #333;
-    }
-  </style>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background-color: #f4f6f9; 
+            margin: 0; 
+            padding: 20px; 
+            color: #333; 
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+        }
+        h1 { 
+            text-align: center; 
+            color: #2c3e50; 
+            margin-bottom: 5px;
+        }
+        .status-bar {
+            text-align: center;
+            margin-bottom: 25px;
+            font-weight: bold;
+        }
+        .connected { color: #27ae60; }
+        .disconnected { color: #c0392b; }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+            gap: 15px; 
+            margin-bottom: 25px; 
+        }
+        .card { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            text-align: center; 
+        }
+        .card h3 { 
+            margin: 0 0 10px 0; 
+            color: #7f8c8d; 
+            font-size: 14px; 
+            text-transform: uppercase; 
+        }
+        .card p { 
+            margin: 0; 
+            font-size: 24px; 
+            font-weight: bold; 
+            color: #2980b9; 
+        }
+        .chart-container { 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1); 
+            height: 40vh; 
+            width: 100%; 
+            box-sizing: border-box; 
+        }
+    </style>
 </head>
 <body>
 
-  <h2>PZEM Real-Time Monitoring </h2>
-  <h2>Kelas Elektronika Daya - 2025 </h2>
+    <div class="container">
+        <h1>PZEM-016 Cloud Monitor</h1>
+        <div class="status-bar">
+            Status Koneksi Broker: <span id="status" class="disconnected">Menghubungkan...</span>
+        </div>
+        
+        <div class="grid">
+            <div class="card"><h3>Tegangan</h3><p><span id="v">0.0</span> V</p></div>
+            <div class="card"><h3>Arus</h3><p><span id="i">0.000</span> A</p></div>
+            <div class="card"><h3>Daya (Beban)</h3><p><span id="p">0.0</span> W</p></div>
+            <div class="card"><h3>Energi Total</h3><p><span id="e">0.000</span> kWh</p></div>
+            <div class="card"><h3>Frekuensi</h3><p><span id="f">0.0</span> Hz</p></div>
+            <div class="card"><h3>Power Factor</h3><p><span id="pf">0.00</span></p></div>
+        </div>
 
-  <div class="container">
-    <!-- Volt -->
-    <div class="gauge-box">
-      <canvas id="gaugeVolt" data-type="radial-gauge"
-        data-width="220"
-        data-height="220"
-        data-min-value="0"
-        data-max-value="300"
-        data-major-ticks="0,50,100,150,200,250,300"
-        data-units="V"
-        data-title="Tegangan"
-        data-value="0"
-        data-color-value="#FF5722"
-        data-glow="true">
-      </canvas>
+        <div class="chart-container">
+            <canvas id="wattChart"></canvas>
+        </div>
     </div>
 
-    <!-- Arus -->
-    <div class="gauge-box">
-      <canvas id="gaugeArus" data-type="radial-gauge"
-        data-width="220"
-        data-height="220"
-        data-min-value="0"
-        data-max-value="100"
-        data-major-ticks="0,10,20,30,40,50,60,70,80,90,100"
-        data-units="A"
-        data-title="Arus"
-        data-value="0"
-        data-color-value="#2196F3"
-        data-glow="true">
-      </canvas>
-    </div>
+    <script>
+        // --- Konfigurasi MQTT ---
+        const broker = "broker.emqx.io";
+        const port = 8084; // Port WSS (Secure WebSocket) wajib untuk HTTPS/GitHub Pages
+        const topic = "/aisi555/pzem016";
+        const clientID = "web_client_" + Math.random().toString(16).substr(2, 8);
 
-    <!-- Daya -->
-    <div class="gauge-box">
-      <canvas id="gaugeDaya" data-type="radial-gauge"
-        data-width="220"
-        data-height="220"
-        data-min-value="0"
-        data-max-value="10000"
-        data-major-ticks="0,2000,4000,6000,8000,10000"
-        data-units="W"
-        data-title="Daya"
-        data-value="0"
-        data-color-value="#4CAF50"
-        data-glow="true">
-      </canvas>
-    </div>
+        // Inisialisasi Paho MQTT Client
+        const mqttClient = new Paho.MQTT.Client(broker, port, clientID);
 
-    <!-- kWh -->
-    <div class="gauge-box">
-      <canvas id="gaugeKwh" data-type="radial-gauge"
-        data-width="220"
-        data-height="220"
-        data-min-value="0"
-        data-max-value="100"
-        data-major-ticks="0,10,20,30,40,50,60,70,80,90,100"
-        data-units="kWh"
-        data-title="Energi"
-        data-value="0"
-        data-color-value="#FF9800"
-        data-glow="true">
-      </canvas>
-    </div>
+        // Atur Callback MQTT
+        mqttClient.onConnectionLost = onConnectionLost;
+        mqttClient.onMessageArrived = onMessageArrived;
 
-    <!-- Frekuensi -->
-    <div class="gauge-box">
-      <canvas id="gaugeFrek" data-type="radial-gauge"
-        data-width="220"
-        data-height="220"
-        data-min-value="40"
-        data-max-value="60"
-        data-major-ticks="40,45,50,55,60"
-        data-units="Hz"
-        data-title="Frekuensi"
-        data-value="50"
-        data-color-value="#9C27B0"
-        data-glow="true">
-      </canvas>
-    </div>
+        // Opsi koneksi secure dengan SSL
+        const connectOptions = {
+            onSuccess: onConnect,
+            onFailure: onFailure,
+            useSSL: true, 
+            timeout: 3,
+            keepAliveInterval: 60
+        };
 
-    <!-- PF -->
-    <div class="gauge-box">
-      <canvas id="gaugePf" data-type="radial-gauge"
-        data-width="220"
-        data-height="220"
-        data-min-value="0"
-        data-max-value="1"
-        data-major-ticks="0,0.2,0.4,0.6,0.8,1.0"
-        data-units=""
-        data-title="Power Factor"
-        data-value="0"
-        data-color-value="#795548"
-        data-glow="true">
-      </canvas>
-    </div>
-  </div>
+        // Hubungkan ke broker
+        mqttClient.connect(connectOptions);
 
-  <script>
-    // Tunggu DOM dan gauge siap
-    window.addEventListener('load', () => {
-      // Tunda sebentar agar canvas-gauges selesai inisialisasi
-      setTimeout(() => {
-        // Ambil semua gauge instance (canvas-gauges menyimpan di window.gauges)
-        const gauges = window.gauges || [];
-        if (gauges.length < 6) {
-          console.error("Gauge tidak terinisialisasi dengan benar");
-          return;
+        function onConnect() {
+            console.log("Terhubung ke MQTT Broker.");
+            const statusEl = document.getElementById("status");
+            statusEl.innerText = "TERHUBUNG";
+            statusEl.className = "connected";
+            
+            // Subscribe ke topik PZEM Anda
+            mqttClient.subscribe(topic);
         }
 
-        // Urutan sesuai urutan <canvas> di HTML
-        const gaugeVolt = gauges[0];
-        const gaugeArus = gauges[1];
-        const gaugeDaya = gauges[2];
-        const gaugeKwh  = gauges[3];
-        const gaugeFrek = gauges[4];
-        const gaugePf   = gauges[5];
+        function onFailure(message) {
+            console.log("Koneksi Gagal: " + message.errorMessage);
+            document.getElementById("status").innerText = "GAGAL TERHUBUNG (" + message.errorMessage + ")";
+        }
 
-        // === MQTT Setup ===
-        const client = new Paho.MQTT.Client("test.mosquitto.org", 8081, "/mqtt", "elkadaya-" + Date.now());
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.log("Koneksi terputus: " + responseObject.errorMessage);
+                const statusEl = document.getElementById("status");
+                statusEl.innerText = "TERPUTUS. Mencoba hubungkan kembali...";
+                statusEl.className = "disconnected";
+                
+                // Coba hubungkan ulang otomatis setelah 5 detik
+                setTimeout(() => mqttClient.connect(connectOptions), 5000);
+            }
+        }
 
-        client.onConnectionLost = (responseObject) => {
-          console.log("Koneksi MQTT terputus:", responseObject.errorMessage);
-        };
+        function onMessageArrived(message) {
+            console.log("Data Masuk: " + message.payloadString);
+            
+            try {
+                // Parse JSON payload dari ESP8266
+                const data = JSON.parse(message.payloadString);
+                
+                // Perbarui nilai text pada Card HTML
+                document.getElementById('v').innerText = data.v.toFixed(1);
+                document.getElementById('i').innerText = data.i.toFixed(3);
+                document.getElementById('p').innerText = data.p.toFixed(1);
+                document.getElementById('e').innerText = data.e.toFixed(3);
+                document.getElementById('f').innerText = data.f.toFixed(1);
+                document.getElementById('pf').innerText = data.pf.toFixed(2);
 
-        client.onMessageArrived = (message) => {
-          try {
-            const data = JSON.parse(message.payloadString);
-            console.log("[JSON] Data valid:", data);
-            // Update nilai gauge
-            if (gaugeVolt) gaugeVolt.value = data.volt || 0;
-            if (gaugeArus) gaugeArus.value = data.arus || 0;
-            if (gaugeDaya) gaugeDaya.value = data.daya || 0;
-            if (gaugeKwh)  gaugeKwh.value  = data.kwh  || 0;
-            if (gaugeFrek) gaugeFrek.value = data.frek || 50;
-            if (gaugePf)   gaugePf.value   = data.pf   || 0;
-          } catch (e) {
-            console.error("Error parsing MQTT message:", e);
-          }
-        };
+                // Perbarui data Grafik (Chart.js)
+                const waktuSekarang = new Date().toLocaleTimeString();
+                updateChart(waktuSekarang, data.p);
 
-        client.connect({
-          useSSL: true, // <-- wajib true jika buka dari https:// atau localhost via Live Server
-          onSuccess: () => {
-            console.log("✅ Terhubung ke MQTT");
-            client.subscribe("/aisi555/pzem"); //subscribe ke TOPIK
-          },
-          onFailure: (err) => {
-            console.error("❌ Gagal terhubung ke MQTT:", err);
-          }
+            } catch (e) {
+                console.error("Format data bukan JSON standar: ", e);
+            }
+        }
+
+        // --- Konfigurasi Chart.js (Grafik Real-time) ---
+        const ctx = document.getElementById('wattChart').getContext('2d');
+        const maxDataPoints = 20; // Jumlah titik data maksimal yang bergeser di layar
+
+        const wattChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Beban Daya (Watt)',
+                    data: [],
+                    borderColor: '#2980b9',
+                    backgroundColor: 'rgba(41, 128, 185, 0.1)',
+                    borderWidth: 2.5,
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { 
+                        title: { display: true, text: 'Waktu Jalur Cloud' } 
+                    },
+                    y: { 
+                        title: { display: true, text: 'Watt (W)' },
+                        beginAtZero: true 
+                    }
+                }
+            }
         });
 
-      }, 800); // Tunggu 800ms agar gauge siap
-    });
-  </script>
+        function updateChart(label, val) {
+            if (wattChart.data.labels.length >= maxDataPoints) {
+                wattChart.data.labels.shift();      // Buang data label paling kiri
+                wattChart.data.datasets[0].data.shift(); // Buang data nilai paling kiri
+            }
+            wattChart.data.labels.push(label);
+            wattChart.data.datasets[0].data.push(val);
+            wattChart.update();
+        }
+    </script>
 </body>
 </html>
